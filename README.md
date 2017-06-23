@@ -1,28 +1,28 @@
-# GPU Kernels for GaussTransform
+# GPU Kernels for Bhattacharya distance between two point sets
 
-GaussTransform is used as a cost function to determine the distance between two Gaussian 
-Mixture Models.
+GPU implementation of a simplyfied Bhattacharya distance between two point sets that explicitly takes
+anisotropic localization uncertainty into account.
 
 
 ## Example usage
 
 The code currently consists of a single class which can be instantiated to allocate
 resources on the GPU. The number you pass to the constructor is the largest possible
-size of the model you wish to compute on (this is simply used for memmory allocations).
+size of the point set you wish to compute on (this is simply used for memmory allocations).
 
-The GPUGaussTransform object performs expensive memory allocations and deallocations and
+The GPUExpDist object performs expensive memory allocations and deallocations and
 as such it should be reused for as many calls to ``compute()`` as possible.
 
-The GPU code currently assumes double precision and 2 dimensional coordinates for the models.
+The GPU code currently assumes double precision and 2 dimensional coordinates for the point sets.
 
 ```
-    #include "gausstransform.h"
+    #include "expdist.h"
 
-    //instantiate GPUGaussTransform object
-    GPUGaussTransform gpu_gt(m);
+    //instantiate GPUExpDist object
+    GPUExpDist gpu_expdist(max_n);
 
     //call the cost function
-    double cost = gpu_gt.compute(A, B, m, n, scale, grad);
+    cost = gpu_expdist.compute(A, B, m, n, scale_A, scale_B);
 
 ```
 
@@ -30,10 +30,10 @@ The ``compute()`` function will take care of transferring the data to the GPU, c
 the GPU functions, as well as
 copying the results back from the GPU to host memory. It will only copy the actual size of
 A and B, so there is no real performance drawback from overestimating the largest possible
-size when creating GPUGaussTransform.
+size when creating GPUExpDist.
  
-The destructor of GPUGaussTransform guarantees that GPU resources are freed when
-the computations on the GPU have finished and the GPUGaussTransform instance is deleted.
+The destructor of GPUExpDist guarantees that GPU resources are freed when
+the computations on the GPU have finished and the GPUExpDist instance is deleted.
 
 
 ## Installation
