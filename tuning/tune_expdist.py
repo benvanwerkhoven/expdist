@@ -9,7 +9,7 @@ from kernel_tuner import tune_kernel
 from tune_utils import get_kernel_path
 
 
-def tune_gausstransform():
+def tune_expdist():
 
     tune_params = OrderedDict()
     tune_params["block_size_x"] = [2**i for i in range(5,10)]
@@ -76,4 +76,4 @@ def tune_gausstransform():
     print(best_config2)
 
 if __name__ == "__main__":
-    tune_gausstransform()
+    tune_expdist()
