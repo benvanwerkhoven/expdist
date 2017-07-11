@@ -24,6 +24,8 @@ GPUExpDist::GPUExpDist(int n) {
     max_n = n;
     dim = 2;
     int elems = max_n * dim;
+    int max_blocks = ((int) ceil(max_n / (block_size_x*tile_size_x)) * (int) ceil(max_n / (block_size_y*tile_size_y)));
+    max_blocks = (int) (ceil(max_blocks / 1e5)*1e5);
 
     cudaError_t err;
 
@@ -47,7 +49,7 @@ GPUExpDist::GPUExpDist(int n) {
         fprintf(stderr, "Error in cudaMalloc: %s\n", cudaGetErrorString(err));
         exit(1);
     }
-    err = cudaMalloc((void **)&d_cross_term, max_n*sizeof(double));
+    err = cudaMalloc((void **)&d_cross_term, max_blocks*sizeof(double));
     if (err != cudaSuccess) {
         fprintf(stderr, "Error in cudaMalloc: %s\n", cudaGetErrorString(err));
         exit(1);
