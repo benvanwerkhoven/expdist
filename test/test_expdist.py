@@ -11,14 +11,14 @@ compiler_options = ['-I'+get_kernel_path()]
 def test_expdist_kernel():
 
     #setup test input
-    allocation_size = 3000
+    allocation_size = int(3000)
     ndim = numpy.int32(2)
     size = numpy.int32(2000)
 
     params = dict()
     params["block_size_x"] = 32
     params["block_size_y"] = 4
-    params["tile_size_x"] = 4
+    params["tile_size_x"] = 2
     params["tile_size_y"] = 4
     params["use_shared_mem"] = 1
 
@@ -37,7 +37,6 @@ def test_expdist_kernel():
         kernel_string = f.read()
 
     arguments = [A, B, size, size, scale_A, scale_B, cost]
-
 
     grid_div_x = ["block_size_x", "tile_size_x"]
     grid_div_y = ["block_size_y", "tile_size_y"]
@@ -65,8 +64,12 @@ def test_expdist_kernel():
     print("answer")
     print(cost)
 
-    assert numpy.isclose(ref_cost, cost, atol=1e-5)
+    print("reference")
+    print("%30.20e" % ref_cost)
+    print("answer")
+    print("%30.20e" % cost)
 
+    assert numpy.isclose(ref_cost, cost, atol=1e-5)
 
 
 def test_hostfunction():
