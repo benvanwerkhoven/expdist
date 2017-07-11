@@ -20,10 +20,12 @@
 #endif
 
 template <int tile_size, int stride, typename T>
-__device__ __forceinline__ void fill_shared_mem_tiled_1D(T (&sh_mem)[tile_size*stride], const T *d_mem, int sh_offset, int d_offset) {
+__device__ __forceinline__ void fill_shared_mem_tiled_1D(T (&sh_mem)[tile_size*stride], const T *d_mem, int sh_offset, int d_offset, int N) {
     #pragma unroll
     for (int ti=0; ti<tile_size; ti++) {
-        sh_mem[sh_offset+ti*stride] = d_mem[d_offset+ti*stride];
+        if (d_offset+ti*stride < N) {
+            sh_mem[sh_offset+ti*stride] = d_mem[d_offset+ti*stride];
+        }
     }
 }
 
@@ -63,11 +65,11 @@ __device__ __forceinline__ void ExpDist_tiled(const T *A, const T *B,
 
     #pragma unroll
     for (int d=0; d<dim; d++) {
-        fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_A[d], A+d*m, tx, i);
-        fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_B[d], B+d*n, ty, j);
+        fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_A[d], A+d*m, tx, i, m);
+        fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_B[d], B+d*n, ty, j, n);
     }
-    fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_scale_A, scale_A, tx, i);
-    fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j);
+    fill_shared_mem_tiled_1D<tile_size_x, block_size_x>(sh_scale_A, scale_A, tx, i, m);
+    fill_shared_mem_tiled_1D<tile_size_y, block_size_y>(sh_scale_B, scale_B, ty, j, n);
     #endif
 
     #pragma unroll
