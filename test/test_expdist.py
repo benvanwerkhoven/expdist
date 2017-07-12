@@ -72,6 +72,72 @@ def test_expdist_kernel():
     assert numpy.isclose(ref_cost, cost, atol=1e-5)
 
 
+
+def test_expdist_kernel_column():
+
+    #setup test input
+    allocation_size = int(3000)
+    ndim = numpy.int32(2)
+    size = numpy.int32(2000)
+
+    params = dict()
+    params["block_size_x"] = 32
+    params["block_size_y"] = 4
+    params["tile_size_x"] = 2
+    params["tile_size_y"] = 4
+    params["use_shared_mem"] = 1
+
+    nblocks = numpy.int32( numpy.ceil(size / float(params["block_size_x"]*params["tile_size_x"])) )
+
+    print("nblocks")
+    print(nblocks)
+
+    cost, A, B, scale_A, scale_B = generate_inputs(allocation_size, ndim, nblocks)
+
+    #call the reference function
+    ref_cost = call_reference_function(size, ndim, A, B, scale_A, scale_B, cost)
+
+    #call the GPU function
+    with open(get_kernel_path()+'kernels.cu', 'r') as f:
+        kernel_string = f.read()
+
+    arguments = [A, B, size, size, scale_A, scale_B, cost]
+
+    grid_div_x = ["block_size_x", "tile_size_x"]
+
+    answer = run_kernel("ExpDist_column", kernel_string, size, arguments, params,
+               compiler_options=compiler_options, grid_div_x=grid_div_x)
+
+    #collect the results from the first kernel
+    cross_term = answer[6]
+    print("intermediate cross_term")
+    print(cross_term)
+
+    #call the second kernel to reduce the per thread block cross terms to a single value
+    out = numpy.zeros(1).astype(numpy.float64)
+
+    arguments = [out, cross_term, size, size, nblocks]
+    answer = run_kernel("reduce_cross_term", kernel_string, 1, arguments, {"block_size_x": 128},
+               compiler_options=compiler_options, grid_div_x=[])
+
+    #final cross term
+    cost = answer[0][0]
+
+    print("reference")
+    print(ref_cost)
+    print("answer")
+    print(cost)
+
+    print("reference")
+    print("%30.20e" % ref_cost)
+    print("answer")
+    print("%30.20e" % cost)
+
+    assert numpy.isclose(ref_cost, cost, atol=1e-5)
+
+
+
+
 def test_hostfunction():
 
     #setup test input
@@ -105,4 +171,4 @@ def test_hostfunction():
 
 
 if __name__ == "__main__":
-    test_gausstransform()
+    test_expdist_kernel()
