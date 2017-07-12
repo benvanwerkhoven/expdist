@@ -24,8 +24,7 @@ GPUExpDist::GPUExpDist(int n) {
     max_n = n;
     dim = 2;
     int elems = max_n * dim;
-    int max_blocks = ((int) ceil(max_n / (block_size_x*tile_size_x)) * (int) ceil(max_n / (block_size_y*tile_size_y)));
-    max_blocks = (int) (ceil(max_blocks / 1e5)*1e5);
+
 
     cudaError_t err;
 
@@ -49,7 +48,7 @@ GPUExpDist::GPUExpDist(int n) {
         fprintf(stderr, "Error in cudaMalloc: %s\n", cudaGetErrorString(err));
         exit(1);
     }
-    err = cudaMalloc((void **)&d_cross_term, max_blocks*sizeof(double));
+    err = cudaMalloc((void **)&d_cross_term, max_n*sizeof(double));
     if (err != cudaSuccess) {
         fprintf(stderr, "Error in cudaMalloc: %s\n", cudaGetErrorString(err));
         exit(1);
@@ -100,19 +99,35 @@ double GPUExpDist::compute(const double *A, const double *B, int m, int n, const
         exit(1);
     }
 
+    //compute number of thread blocks that would be used by the ExpDist kernel for this m and n
+    int nblocks = ((int) ceil(m / (block_size_x*tile_size_x)) * (int) ceil(n / (block_size_y*tile_size_y)));
+
     //setup kernel execution parameters
     dim3 threads(block_size_x, block_size_y, 1);
-    int grid_x = (int) ceilf(m / (float)(block_size_x * tile_size_x));
-    int grid_y = (int) ceilf(n / (float)(block_size_y * tile_size_y));
-    dim3 grid(grid_x, grid_y, 1);
+    dim3 grid(1, 1, 1); //to be overwritten
+
+    //check if the number of thread blocks does not exceed the allocated space
+    //if it does, run the ExpDist_column kernel that uses fewer thread blocks
+    if (nblocks < max_n) {
+        //setup kernel execution parameters
+        grid.x = (int) ceilf(m / (float)(block_size_x * tile_size_x));
+        grid.y = (int) ceilf(n / (float)(block_size_y * tile_size_y));
     
-    //call the first kernel
-    ExpDist<<<grid, threads, 0, stream>>>(d_A, d_B, m, n, d_scale_A, d_scale_B, d_cross_term); 
+        //call the first kernel
+        ExpDist<<<grid, threads, 0, stream>>>(d_A, d_B, m, n, d_scale_A, d_scale_B, d_cross_term); 
+
+    } else {
+        //setup kernel execution parameters
+        grid.x = (int) ceilf(m / (float)(block_size_x * tile_size_x));
+    
+        //call the first kernel
+        ExpDist_column<<<grid, threads, 0, stream>>>(d_A, d_B, m, n, d_scale_A, d_scale_B, d_cross_term); 
+    }
 
     //call the second kernel
     dim3 threads2(reduce_block_size, 1, 1);
     dim3 grid2(1, 1, 1);
-    reduce_cross_term<<<grid2, threads2, 0, stream>>>(d_cross_term, d_cross_term, m, n, grid_x*grid_y);
+    reduce_cross_term<<<grid2, threads2, 0, stream>>>(d_cross_term, d_cross_term, m, n, grid.x*grid.y);
 
     err = cudaMemcpyAsync(&cost, d_cross_term, 1*sizeof(double), cudaMemcpyDeviceToHost, stream);
     if (err != cudaSuccess) {

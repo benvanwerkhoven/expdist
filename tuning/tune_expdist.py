@@ -11,16 +11,18 @@ from tune_utils import get_kernel_path
 
 def tune_expdist():
 
+    device = 2
+
     tune_params = OrderedDict()
-    tune_params["block_size_x"] = [2**i for i in range(5,10)]
+    tune_params["block_size_x"] = [32] #[2**i for i in range(5,10)]
     tune_params["block_size_y"] = [2**i for i in range(6)]
     tune_params["tile_size_x"] = [2**i for i in range(4)]
     tune_params["tile_size_y"] = [2**i for i in range(4)]
-    tune_params["use_shared_mem"] = [0, 1]
+    tune_params["use_shared_mem"] = [1] #[0, 1]
 
     #setup test input
-    alloc_size = 3000
-    size = numpy.int32(2000)
+    alloc_size = 22000
+    size = numpy.int32(20000)
     max_blocks = numpy.int32( numpy.ceil(size / float(numpy.amin(tune_params["block_size_x"]))) *
                               numpy.ceil(size / float(numpy.amin(tune_params["block_size_y"]))) )
     ndim = numpy.int32(2)
@@ -32,12 +34,12 @@ def tune_expdist():
     cost = numpy.zeros((max_blocks)).astype(numpy.float64)
 
     #time the reference function
-    arguments = [cost, A, B, size, size, ndim, scale_A, scale_B]
-    with open(get_kernel_path()+'expdist_c.cpp', 'r') as f:
-        kernel_string = f.read()
-    print("CPU timing")
-    tune_kernel("time_expdist", kernel_string, size, arguments, {"block_size_x": [1]},
-               lang="C", compiler_options=['-I'+get_kernel_path(), '-O3'])
+    #arguments = [cost, A, B, size, size, ndim, scale_A, scale_B]
+    #with open(get_kernel_path()+'expdist_c.cpp', 'r') as f:
+    #    kernel_string = f.read()
+    #print("CPU timing")
+    #tune_kernel("time_expdist", kernel_string, size, arguments, {"block_size_x": [1]},
+    #           lang="C", compiler_options=['-I'+get_kernel_path(), '-O3'], device=2)
 
     #tune the GPU function
     print("GPU timing")
@@ -52,7 +54,7 @@ def tune_expdist():
     grid_div_y = ["block_size_y", "tile_size_y"]
 
     kernel1 = tune_kernel("ExpDist", kernel_string, (size, size), arguments, tune_params,
-               compiler_options=cp, grid_div_x=grid_div_x, grid_div_y=grid_div_y)
+               compiler_options=cp, grid_div_x=grid_div_x, grid_div_y=grid_div_y, device=2)
 
     with open("expdist.json", 'w') as fp:
         json.dump(kernel1, fp)
@@ -67,7 +69,7 @@ def tune_expdist():
 
     arguments = [numpy.zeros(1).astype(numpy.float64), cost, size, size, nblocks]
     kernel2 = tune_kernel("reduce_cross_term", kernel_string, 1, arguments, tune_params,
-                grid_div_x=[], compiler_options=cp)
+                grid_div_x=[], compiler_options=cp, device=2)
 
     best_config2 = min(kernel2[0], key=lambda x:x['time'])
 

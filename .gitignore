@@ -3,3 +3,4 @@
 *.mex*
 __pycache__
 bin/
+*.json

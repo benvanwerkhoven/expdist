@@ -170,5 +170,60 @@ def test_hostfunction():
 
 
 
+
+
+def test_hostfunction_largeN():
+
+    #setup test input
+    allocation_size = numpy.int32(1e6)
+    size = numpy.int32(40000)
+    ndim = numpy.int32(2)
+
+    params = dict()
+    params["block_size_x"] = 32
+    params["block_size_y"] = 4
+    params["tile_size_x"] = 2
+    params["tile_size_y"] = 4
+    params["use_shared_mem"] = 1
+
+    #compute nblocks for when using the expdist kernel
+    nblocks = numpy.int32( numpy.ceil(size / float(params["block_size_x"]*params["tile_size_x"])) *
+                           numpy.ceil(size / float(params["block_size_y"]*params["tile_size_y"])) )
+
+    #ensure that this test actually causes the host code to call the column kernel
+    assert nblocks > allocation_size
+
+    #compute the nblocks actually used by the column kernel
+    nblocks = numpy.int32(numpy.ceil(size / float(params["block_size_x"] * params["tile_size_x"])))
+
+    #generate input data
+    cost, A, B, scale_A, scale_B = generate_inputs(allocation_size, ndim, nblocks)
+
+    #call the ExpDist_column kernel directly for reference
+    arguments = [A, B, size, size, scale_A, scale_B, cost]
+    grid_div_x = ["block_size_x", "tile_size_x"]
+    with open(get_kernel_path()+'kernels.cu', 'r') as f:
+        kernel_string = f.read()
+    answer = run_kernel("ExpDist_column", kernel_string, size, arguments, params,
+               compiler_options=compiler_options, grid_div_x=grid_div_x)
+    ref_cost = numpy.sum(answer[6])
+
+    #call the host function
+    arguments = [cost, A, B, size, size, ndim, scale_A, scale_B, allocation_size]
+    with open(get_kernel_path()+'expdist.cu', 'r') as f:
+        kernel_string = f.read()
+    answer = run_kernel("test_GPUExpDistHost", kernel_string, size, arguments, {},
+               lang="C", compiler_options=compiler_options+['-arch=sm_30'])
+    cost = answer[0][0]
+
+    print("reference")
+    print(ref_cost)
+
+    print("answer")
+    print(cost)
+
+    assert numpy.isclose(ref_cost, cost, atol=1e-5)
+
+
 if __name__ == "__main__":
     test_expdist_kernel()
